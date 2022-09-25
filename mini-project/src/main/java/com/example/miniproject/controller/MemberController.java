@@ -1,6 +1,7 @@
 package com.example.miniproject.controller;
 
 import com.example.miniproject.dto.MemberDto;
+import com.example.miniproject.dto.MultiResponseDto;
 import com.example.miniproject.dto.SingleResponseDto;
 import com.example.miniproject.mapper.MemberMapper;
 import com.example.miniproject.model.Member;
@@ -8,110 +9,76 @@ import com.example.miniproject.model.Member;
 import com.example.miniproject.service.MemberService;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Autowired;
+
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.annotation.Secured;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
+import java.util.List;
+
 
 @RestController
-@Slf4j
 @RequestMapping
 @Validated
+@Slf4j
 public class MemberController {
-
     private final MemberService memberService;
-    private final MemberMapper memberMapper;
-    @Autowired
-    private final BCryptPasswordEncoder bCryptPasswordEncoder;
+    private final MemberMapper mapper;
 
-    public MemberController(MemberService memberService, MemberMapper memberMapper, BCryptPasswordEncoder bCryptPasswordEncoder){
+    public MemberController(MemberService memberService, MemberMapper mapper) {
         this.memberService = memberService;
-        this.memberMapper = memberMapper;
-        this.bCryptPasswordEncoder = bCryptPasswordEncoder;
+        this.mapper = mapper;
     }
 
-    @GetMapping("/")
-    public @ResponseBody String index() {
-        return "index";
-    }
+    @PostMapping("/v1/auth/signup")
+    public ResponseEntity postMember(@Valid @RequestBody MemberDto.Post requestBody) {
 
-    @GetMapping("/user")
-    public @ResponseBody String user() {
-        return "user";
-    }
+        Member member = mapper.memberPostToMember(requestBody);
 
-    @GetMapping("/admin")
-    public @ResponseBody String admin() {
-        return "admin";
-    }
-
-    @GetMapping("/manager")
-    public @ResponseBody String manager() {
-        return "manager";
-    }
-
-    @GetMapping("/login")
-    public String login() {
-        return "loginForm";
-    }
-
-    @PostMapping("/join")
-    public ResponseEntity postMember(@RequestBody MemberDto.Post requestBody){
-        Member member = memberMapper.memberPostToMember(requestBody);
-        member.setRole("ROLE_USER");
-        String rawPassword = member.getPassword();
-        String encPassword = bCryptPasswordEncoder.encode(rawPassword);
-        member.setPassword(encPassword);
-
-        Member createdMember = MemberService.createMember(member);
-        MemberDto.Response response = memberMapper.memberToMemberResponse(createdMember);
+        Member createdMember = memberService.createMember(member);
+        MemberDto.Response response = mapper.memberToMemberResponse(createdMember);
 
         return new ResponseEntity<>(new SingleResponseDto<>(response), HttpStatus.CREATED);
     }
 
-    @PatchMapping("/{user-name}")
-    public ResponseEntity patchMember(@PathVariable("user-name") String username, @RequestBody MemberDto.Patch requestBody){
-        requestBody.setUsername(username);
-        requestBody.setPassword(bCryptPasswordEncoder.encode(requestBody.getPassword()));
+    @PatchMapping("/v1/members")
+    public ResponseEntity patchMember(@PathVariable("member-id") long memberId,
+                                      @Valid @RequestBody MemberDto.Patch requestBody) {
 
-        Member member = memberService.updateMember(memberMapper.memberPatchToMember(requestBody));
+        requestBody.setMemberId(memberId);
 
-        return new ResponseEntity<>(
-                new SingleResponseDto<>(memberMapper.memberToMemberResponse(member)),HttpStatus.OK
-        );
+        Member member =
+                memberService.updateMember(mapper.memberPatchToMember(requestBody));
+
+        return new ResponseEntity<>(new SingleResponseDto<>(mapper.memberToMemberResponse(member)), HttpStatus.OK);
     }
 
-    @GetMapping("/{user-name}")
-    public ResponseEntity getMember(
-            @PathVariable("user-name") String username) {
-        Member member = memberService.findMember(username);
-        return new ResponseEntity<>(
-                new SingleResponseDto<>(memberMapper.memberToMemberResponse(member))
-                , HttpStatus.OK);
+    @GetMapping("/v1/members/{member-id}")
+    public ResponseEntity getMember(@PathVariable("member-id") long memberId) {
+
+        Member member = memberService.findMember(memberId);
+
+        return new ResponseEntity<>(new SingleResponseDto<>(mapper.memberToMemberResponse(member)), HttpStatus.OK);
     }
 
-    @DeleteMapping("/{user-name}")
-    public ResponseEntity deleteMember(
-            @PathVariable("user-name") String username) {
-        memberService.deleteMember(username);
+    @GetMapping("v1/members")
+    public ResponseEntity getMembers(@RequestParam int page,
+                                     @RequestParam int size) {
+
+        Page<Member> pageMembers = memberService.findMembers(page - 1, size);
+        List<Member> members = pageMembers.getContent();
+
+        return new ResponseEntity<>(new MultiResponseDto<>(mapper.membersToMemberResponses(members), pageMembers), HttpStatus.OK);
+    }
+
+    @DeleteMapping("v1/members/{member-id}")
+    public ResponseEntity deleteMember(@PathVariable("member-id") long memberId) {
+
+        memberService.deleteMember(memberId);
 
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-    }
-
-    @Secured("ROLE_ADMIN")
-    @GetMapping("/info")
-    public @ResponseBody String info() {
-        return "info";
-    }
-
-    @PreAuthorize("hasRole('ROLE_MANAGER') or hasRole('ROLE_ADMIN')")
-    @GetMapping("/data")
-    public @ResponseBody String data() {
-        return "data";
     }
 }

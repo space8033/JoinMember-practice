@@ -1,22 +1,50 @@
 package com.example.miniproject.model;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import java.time.LocalDateTime;
+import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
 public class Member {
-
     @Id
-    private String username;
-    private String password;
-    private String email;
-    private String role;
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long memberId;
 
+    @Column
+    private String email;
+    @Column
+    private String password;
+
+    @Column
+    private String name;
+    @Column
+    private String nickname;
+    @Column
+    private String information;
+    @Column
+    private String imgUrl;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<String> roles = new ArrayList<>();
+
+    public Member(String email) {
+        this.email = email;
+    }
+
+    public Member(String email, String name, String nickname, String information, String imgUrl) {
+        this.email = email;
+        this.name = name;
+        this.nickname = nickname;
+        this.information = information;
+        this.imgUrl = imgUrl;
+    }
 
 }
